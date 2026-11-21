@@ -1,0 +1,37 @@
+{
+  "name": "jsonassert-playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Online playground for the jsonassert assertion language (GitHub Pages)",
+  "type": "module",
+  "scripts": {
+    "postinstall": "bun scripts/link-engine.ts",
+    "link-engine": "bun scripts/link-engine.ts",
+    "dev": "bun scripts/link-engine.ts && vite",
+    "build": "bun scripts/link-engine.ts && vite build",
+    "preview": "vite preview",
+    "typecheck": "bun scripts/typecheck.ts",
+    "test": "bun scripts/link-engine.ts && bun test ./src",
+    "verify": "bun run typecheck && bun run test && bun run build"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.8",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "codemirror": "^6.0.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "@types/react": "18",
+    "@types/react-dom": "18",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "5",
+    "vite": "^8.3.8"
+  }
+}
