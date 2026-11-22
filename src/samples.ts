@@ -115,11 +115,11 @@ export const SAMPLES: Sample[] = [
     json: cart,
     expr: [
       'assert $count(itens) == 3',
-      'assert $map(itens, function($v) { $v.valor }) == [10, 50, 20]',
-      'assert $count($filter(itens, function($v) { $v.valor > 20 })) == 1',
-      'assert $reduce(itens, function($acc, $v) { $acc + $v.valor * $v.qty }, 0) == 130',
+      'assert $map(itens, function(v) { v.valor }) == [10, 50, 20]',
+      'assert $count($filter(itens, function(v) { v.valor > 20 })) == 1',
+      'assert $reduce(itens, function(acc, v) { acc + v.valor * v.qty }, 0) == 130',
       'assert $sum(itens.(valor * qty)) >= 100',
-      '$filter(itens, function($v) { $v.qty > 1 }).nome'
+      '$filter(itens, function(v) { v.qty > 1 }).nome'
     ].join('\n'),
     expected: ['pass', 'pass', 'pass', 'pass', 'pass', 'value']
   },
