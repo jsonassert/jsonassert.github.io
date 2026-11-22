@@ -159,7 +159,7 @@ export function App() {
           <label className="sample-select">
             <span>Sample</span>
             <select value={sampleId} onChange={(e) => loadSample(e.target.value)}>
-              {sampleId === '' && <option value="">Custom (shared link)</option>}
+              {sampleId === '' && <option value="">Custom</option>}
               {SAMPLES.map((s) => (
                 <option key={s.id} value={s.id}>{s.title}</option>
               ))}
