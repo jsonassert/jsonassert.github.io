@@ -12,10 +12,17 @@ language in the browser: https://jsonassert.github.io/
   the canonical JSONata form of the line, and errors (code, message and the
   offending position underlined in the editor when the engine reports one).
 
-Evaluation is live (debounced), runs entirely client-side, and the address bar
-always carries the current input + expressions (deflate-compressed in the hash),
-so any state can be shared with **Copy link**. The **Sample** menu loads
-examples taken from the engine's own test suites.
+Evaluation is live (debounced) and runs entirely client-side. The address bar
+always carries the current content as plain, readable query parameters — no
+compression, no base64 — so any state can be shared with **Copy link**:
+
+- a built-in sample: `https://jsonassert.github.io/?s=control-flow`
+- custom content: `https://jsonassert.github.io/?expr=assert%20a%20%3D%3D%201&json=%7B%22a%22%3A%201%7D`
+
+The **Sample** menu loads examples taken from the engine's own test suites and
+navigates to the sample's `?s=<slug>` URL; as soon as the content differs from
+every sample the address bar switches to the explicit `expr` / `json` form.
+Unknown or malformed parameters fall back to the default sample.
 
 ## Development
 

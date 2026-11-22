@@ -1,47 +1,92 @@
-// Shareable state: JSON input + expression, deflate-compressed and base64url
-// encoded into the URL hash as `#s=<payload>`.
+// Shareable state as ordinary query parameters, readable in the address bar:
+// `?s=<sample-slug>` for a built-in sample, `?expr=<assert lines>&json=<input>`
+// (percent-encoded) for custom content.
+
+import { DEFAULT_SAMPLE, SAMPLES, sampleBySlug, sampleJson, type Sample } from './samples';
 
 export interface ShareState {
   json: string;
   expr: string;
 }
 
-const PREFIX = 's=';
-
-function toBase64Url(bytes: Uint8Array): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+export interface DecodedShare {
+  state: ShareState;
+  sampleId: string;
 }
 
-function fromBase64Url(text: string): Uint8Array {
-  const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+const SAMPLE_PARAM = 's';
+const EXPR_PARAM = 'expr';
+const JSON_PARAM = 'json';
+
+function sampleState(sample: Sample): ShareState {
+  return { json: sampleJson(sample), expr: sample.expr };
 }
 
-async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
-  const response = new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream));
-  return new Uint8Array(await response.arrayBuffer());
+export function defaultShare(): DecodedShare {
+  return { state: sampleState(DEFAULT_SAMPLE), sampleId: DEFAULT_SAMPLE.id };
 }
 
-export async function encodeState(state: ShareState): Promise<string> {
-  const raw = new TextEncoder().encode(JSON.stringify({ j: state.json, e: state.expr }));
-  return PREFIX + toBase64Url(await pipe(raw, new CompressionStream('deflate-raw')));
+/** The built-in sample holding exactly this content, when there is one. */
+export function sampleFor(state: ShareState): Sample | undefined {
+  return SAMPLES.find((s) => s.expr === state.expr && sampleJson(s) === state.json);
 }
 
-/** Returns null for an absent or malformed hash. Accepts the hash with or without '#'. */
-export async function decodeState(hash: string): Promise<ShareState | null> {
-  const text = hash.startsWith('#') ? hash.slice(1) : hash;
-  if (!text.startsWith(PREFIX)) return null;
+export function encodeSample(slug: string): string {
+  return `${SAMPLE_PARAM}=${encodeURIComponent(slug)}`;
+}
+
+export function encodeState(state: ShareState): string {
+  return `${EXPR_PARAM}=${encodeURIComponent(state.expr)}&${JSON_PARAM}=${encodeURIComponent(state.json)}`;
+}
+
+/** Query string for the address bar; sample content keeps its short slug form. */
+export function shareQuery(state: ShareState): string {
+  const sample = sampleFor(state);
+  return sample ? encodeSample(sample.id) : encodeState(state);
+}
+
+/**
+ * Strict decode of a search string, with or without the leading '?'.
+ * Returns null when the relevant params are absent or malformed.
+ */
+export function decodeState(search: string): ShareState | null {
+  let params: Map<string, string>;
   try {
-    const bytes = await pipe(fromBase64Url(text.slice(PREFIX.length)), new DecompressionStream('deflate-raw'));
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as { j?: unknown; e?: unknown };
-    if (typeof parsed.j !== 'string' || typeof parsed.e !== 'string') return null;
-    return { json: parsed.j, expr: parsed.e };
+    params = parseQuery(search.startsWith('?') ? search.slice(1) : search);
   } catch {
     return null;
   }
+  const slug = params.get(SAMPLE_PARAM);
+  if (slug) {
+    const sample = sampleBySlug(slug);
+    if (sample) return sampleState(sample);
+  }
+  const expr = params.get(EXPR_PARAM);
+  const json = params.get(JSON_PARAM);
+  if (expr === undefined && json === undefined) return null;
+  return { json: json ?? '', expr: expr ?? '' };
+}
+
+/** Decode for the UI: the state plus the matching sample selection, defaulting to the first sample. */
+export function decodeShare(search: string): DecodedShare {
+  const state = decodeState(search);
+  if (!state) return defaultShare();
+  return { state, sampleId: sampleFor(state)?.id ?? '' };
+}
+
+function parseQuery(query: string): Map<string, string> {
+  const params = new Map<string, string>();
+  for (const part of query.split('&')) {
+    if (part === '') continue;
+    const eq = part.indexOf('=');
+    const key = eq === -1 ? part : part.slice(0, eq);
+    const value = eq === -1 ? '' : part.slice(eq + 1);
+    params.set(decodeParam(key), decodeParam(value));
+  }
+  return params;
+}
+
+/** Percent-decodes a query component ('+' stands for a space, as in a typed URL); throws when malformed. */
+function decodeParam(text: string): string {
+  return decodeURIComponent(text.replace(/\+/g, ' '));
 }

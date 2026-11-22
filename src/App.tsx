@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Editor, type EditorProblem } from './editor';
 import { parseJson, run, show, type LineResult } from './runner';
-import { DEFAULT_SAMPLE, SAMPLES, sampleJson } from './samples';
-import { decodeState, encodeState } from './share';
+import { SAMPLES, sampleBySlug } from './samples';
+import { decodeShare, encodeSample, shareQuery, type ShareState } from './share';
 
 const ENGINE_REPO = 'https://github.com/jsonassert/jsonassert-lang';
 const JSONATA_DOCS = 'https://docs.jsonata.org/';
@@ -65,29 +65,30 @@ function ResultCard({ r, onJump }: { r: LineResult; onJump: (line: number) => vo
   );
 }
 
-export function App() {
-  const [json, setJson] = useState(() => sampleJson(DEFAULT_SAMPLE));
-  const [expr, setExpr] = useState(DEFAULT_SAMPLE.expr);
-  const [sampleId, setSampleId] = useState(DEFAULT_SAMPLE.id);
-  const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle');
-  const loaded = useRef(false);
+/** Absolute URL of the address bar; the browser normalizes the query (a `'` becomes `%27`). */
+function shareUrl(state: ShareState): URL {
+  return new URL(`${window.location.pathname}?${shareQuery(state)}`, window.location.origin);
+}
 
-  // Restore shared state from the hash (on load and on manual hash edits).
-  useEffect(() => {
-    const restore = () => {
-      void decodeState(window.location.hash).then((state) => {
-        if (state) {
-          setJson(state.json);
-          setExpr(state.expr);
-          setSampleId('');
-        }
-        loaded.current = true;
-      });
-    };
-    restore();
-    window.addEventListener('hashchange', restore);
-    return () => window.removeEventListener('hashchange', restore);
+export function App() {
+  const [initial] = useState(() => decodeShare(window.location.search));
+  const [json, setJson] = useState(initial.state.json);
+  const [expr, setExpr] = useState(initial.state.expr);
+  const [sampleId, setSampleId] = useState(initial.sampleId);
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle');
+
+  // The address bar is the source of truth: back/forward and hand-edited URLs reload the editors.
+  const applyUrl = useCallback(() => {
+    const share = decodeShare(window.location.search);
+    setJson(share.state.json);
+    setExpr(share.state.expr);
+    setSampleId(share.sampleId);
   }, []);
+
+  useEffect(() => {
+    window.addEventListener('popstate', applyUrl);
+    return () => window.removeEventListener('popstate', applyUrl);
+  }, [applyUrl]);
 
   const djson = useDebounced(json, 250);
   const dexpr = useDebounced(expr, 250);
@@ -113,34 +114,24 @@ export function App() {
       });
   }, [summary, dexpr]);
 
-  // Keep the URL in sync so the address bar is always shareable.
+  // Keep the address bar in sync while typing, without adding history entries.
   useEffect(() => {
-    if (!loaded.current) return;
-    let cancelled = false;
-    void encodeState({ json: djson, expr: dexpr }).then((hash) => {
-      if (!cancelled && window.location.hash !== `#${hash}`) {
-        history.replaceState(null, '', `#${hash}`);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    const url = shareUrl({ json: djson, expr: dexpr });
+    if (window.location.href !== url.href) history.replaceState(history.state, '', url);
   }, [djson, dexpr]);
 
-  const loadSample = (id: string) => {
-    const sample = SAMPLES.find((s) => s.id === id);
+  const loadSample = (slug: string) => {
+    const sample = sampleBySlug(slug);
     if (!sample) return;
-    setSampleId(id);
-    setJson(sampleJson(sample));
-    setExpr(sample.expr);
+    history.pushState(null, '', `?${encodeSample(sample.id)}`);
+    applyUrl();
   };
 
   const copyLink = async () => {
     try {
-      const hash = await encodeState({ json, expr });
-      const url = `${window.location.origin}${window.location.pathname}#${hash}`;
-      history.replaceState(null, '', `#${hash}`);
-      await navigator.clipboard.writeText(url);
+      const url = shareUrl({ json, expr });
+      history.replaceState(history.state, '', url);
+      await navigator.clipboard.writeText(url.href);
       setCopied('ok');
     } catch {
       setCopied('fail');

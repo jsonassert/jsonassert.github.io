@@ -1,12 +1,21 @@
 import { describe, expect, test } from 'bun:test';
-import { SAMPLES, sampleJson } from './samples';
+import { SAMPLES, sampleBySlug, sampleJson } from './samples';
 import { parseJson, run } from './runner';
 
 describe('samples', () => {
-  test('ids are unique and titles present', () => {
+  test('ids are unique URL slugs and titles present', () => {
     const ids = SAMPLES.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const s of SAMPLES) expect(s.title.length).toBeGreaterThan(0);
+    for (const s of SAMPLES) {
+      expect(s.title.length).toBeGreaterThan(0);
+      expect(s.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+    }
+  });
+
+  test('sampleBySlug resolves every id', () => {
+    for (const s of SAMPLES) expect(sampleBySlug(s.id)).toBe(s);
+    expect(sampleBySlug('nope')).toBeUndefined();
+    expect(sampleBySlug('')).toBeUndefined();
   });
 
   test('cover the documented feature set', () => {

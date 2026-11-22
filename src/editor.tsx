@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { EditorState, type Extension } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, placeholder as placeholderExt } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { bracketMatching, indentOnInput, syntaxHighlighting, HighlightStyle, StreamLanguage, foldGutter } from '@codemirror/language';
+import { bracketMatching, indentOnInput, syntaxHighlighting, HighlightStyle, StreamLanguage, foldGutter, type StringStream } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
 import { setDiagnostics, lintGutter, type Diagnostic } from '@codemirror/lint';
 import { tags as t } from '@lezer/highlight';
@@ -28,37 +28,46 @@ const KEYWORDS = new Set([
 ]);
 const ATOMS = new Set(['true', 'false', 'null']);
 
-/** Minimal stream tokenizer for the jsonassert language. */
-export const jsonassertLanguage = StreamLanguage.define<{ inString: string | null }>({
+interface TokenState {
+  inString: string | null;
+}
+
+/**
+ * Minimal stream tokenizer for the jsonassert language. CodeMirror calls it
+ * unbound, so the string branch recurses by name instead of through `this`.
+ */
+function tokenize(stream: StringStream, state: TokenState): string | null {
+  if (state.inString) {
+    while (!stream.eol()) {
+      const ch = stream.next();
+      if (ch === '\\') stream.next();
+      else if (ch === state.inString) { state.inString = null; break; }
+    }
+    return 'string';
+  }
+  if (stream.eatSpace()) return null;
+  if (stream.match('//')) { stream.skipToEnd(); return 'comment'; }
+  const ch = stream.peek();
+  if (ch === '"' || ch === "'") { state.inString = stream.next() ?? null; return tokenize(stream, state); }
+  if (ch === '`') { stream.next(); stream.skipTo('`') ? stream.next() : stream.skipToEnd(); return 'propertyName'; }
+  if (stream.match(/^-?\d+(\.\d+)?([eE][+-]?\d+)?/)) return 'number';
+  if (stream.match(/^\$[A-Za-z_][\w]*(?=\s*\()/)) return 'function';
+  if (stream.match(/^\$[A-Za-z_]?\w*/)) return 'variableName';
+  if (stream.match(/^[A-Za-z_][\w]*/)) {
+    const word = stream.current();
+    if (KEYWORDS.has(word)) return 'keyword';
+    if (ATOMS.has(word)) return 'atom';
+    return 'propertyName';
+  }
+  if (stream.match(/^(==|!=|>=|<=|[=<>+\-*/?:])/)) return 'operator';
+  stream.next();
+  return 'punctuation';
+}
+
+export const jsonassertLanguage = StreamLanguage.define<TokenState>({
   name: 'jsonassert',
   startState: () => ({ inString: null }),
-  token(stream, state) {
-    if (state.inString) {
-      while (!stream.eol()) {
-        const ch = stream.next();
-        if (ch === '\\') stream.next();
-        else if (ch === state.inString) { state.inString = null; break; }
-      }
-      return 'string';
-    }
-    if (stream.eatSpace()) return null;
-    if (stream.match('//')) { stream.skipToEnd(); return 'comment'; }
-    const ch = stream.peek();
-    if (ch === '"' || ch === "'") { state.inString = stream.next() ?? null; return this.token!(stream, state); }
-    if (ch === '`') { stream.next(); stream.skipTo('`') ? stream.next() : stream.skipToEnd(); return 'propertyName'; }
-    if (stream.match(/^-?\d+(\.\d+)?([eE][+-]?\d+)?/)) return 'number';
-    if (stream.match(/^\$[A-Za-z_][\w]*(?=\s*\()/)) return 'function';
-    if (stream.match(/^\$[A-Za-z_]?\w*/)) return 'variableName';
-    if (stream.match(/^[A-Za-z_][\w]*/)) {
-      const word = stream.current();
-      if (KEYWORDS.has(word)) return 'keyword';
-      if (ATOMS.has(word)) return 'atom';
-      return 'propertyName';
-    }
-    if (stream.match(/^(==|!=|>=|<=|[=<>+\-*/?:])/)) return 'operator';
-    stream.next();
-    return 'punctuation';
-  },
+  token: tokenize,
   languageData: { commentTokens: { line: '//' } }
 });
 

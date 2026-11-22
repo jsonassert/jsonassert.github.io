@@ -4,6 +4,7 @@
 import type { LineStatus } from './runner';
 
 export interface Sample {
+  /** Kebab-case; doubles as the shareable URL slug (`?s=<id>`). */
   id: string;
   title: string;
   json: unknown;
@@ -168,4 +169,8 @@ export const DEFAULT_SAMPLE = SAMPLES[0]!;
 
 export function sampleJson(sample: Sample): string {
   return JSON.stringify(sample.json, null, 2);
+}
+
+export function sampleBySlug(slug: string): Sample | undefined {
+  return SAMPLES.find((s) => s.id === slug);
 }

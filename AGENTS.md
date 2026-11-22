@@ -16,7 +16,7 @@ domain root). Code, comments and docs in English.
 | Path | What it is |
 |---|---|
 | `src/runner.ts` | Non-UI logic: splits the expression document into lines, runs asserts / plain expressions, maps engine error positions to document offsets, parses the JSON input |
-| `src/share.ts` | URL state: `#s=<base64url(deflate-raw(JSON))>` encode/decode |
+| `src/share.ts` | URL state: `?s=<sample-slug>` or `?expr=<text>&json=<text>` (percent-encoded query params) encode/decode |
 | `src/samples.ts` | Sample datasets + expressions (from the engine tests) with the documented outcome per line |
 | `src/App.tsx`, `src/editor.tsx`, `src/styles.css` | UI |
 | `src/*.test.ts` | `bun test` suites for runner, share and samples (no UI tests) |
@@ -66,7 +66,11 @@ for a project Pages path instead.
 
 ## Conventions
 
-- Beta: no backward-compat concerns (the URL hash format may change).
+- Beta: no backward-compat concerns (the shareable URL scheme may change).
+- Sharing uses query parameters only (`?s=<slug>`, `?expr=…&json=…`, plain
+  percent-encoding): Pages is static, so unknown path routes 404, and the
+  shared state must stay readable in the address bar.
 - Keep non-UI logic in plain modules with `bun test` coverage; samples must
-  keep their `expected` outcomes in sync (`src/samples.test.ts` enforces it).
+  keep their `expected` outcomes in sync, and their `id`s double as the URL
+  slugs, so they stay unique kebab-case (`src/samples.test.ts` enforces both).
 - Original look: do not copy branding, styles or text from try.jsonata.org.
