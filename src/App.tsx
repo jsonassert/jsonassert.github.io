@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Editor, type EditorProblem } from './editor';
-import { parseJson, run, show, type LineResult } from './runner';
+import { parseJson, run, show } from './runner';
+import type { LineResult } from './runner.z';
 import { SAMPLES, sampleBySlug } from './samples';
 import { decodeShare, encodeSample, shareQuery, type ShareState } from './share';
 

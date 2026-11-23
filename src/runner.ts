@@ -1,38 +1,12 @@
 // Non-UI evaluation logic: splits the expression editor into lines and runs
 // each one through the jsonassert engine, producing display-ready results.
 import { JsonataError, evaluate, evaluateAssertion, parseAssert, render, OPERATORS } from '@jsonassert/jsonassert-js';
-import type { Node, Operator } from '@jsonassert/jsonassert-js';
+import type { Node } from '@jsonassert/jsonassert-js';
+import type { JsonParse, LineError, LineResult, RunSummary } from './runner.z';
 
-export type LineStatus = 'pass' | 'fail' | 'value' | 'error';
-
-export interface LineError {
-  code: string;
-  message: string;
-  /** Absolute character offset inside the editor document, when known. */
-  from: number | null;
-}
-
-export interface LineResult {
-  /** 1-based line number in the expression editor. */
-  line: number;
-  source: string;
-  kind: 'assert' | 'expression';
-  status: LineStatus;
-  operator?: Operator;
-  actual?: unknown;
-  expected?: unknown;
-  /** Plain-expression result. */
-  value?: unknown;
-  jsonata?: string;
-  error?: LineError;
-}
-
-export interface RunSummary {
-  results: LineResult[];
-  passed: number;
-  failed: number;
-  errors: number;
-}
+// The shapes this module produces are declared in runner.z.ts — one zod schema each, the types
+// inferred there — and are deliberately not re-exported from here: import them from the schema
+// module. This file is the implementation only.
 
 /** Lines starting with `//` (after whitespace) are comments; the engine has no comment syntax. */
 export function isComment(text: string): boolean {
@@ -177,11 +151,6 @@ export function run(source: string, input: unknown): RunSummary {
     failed: results.filter((r) => r.status === 'fail').length,
     errors: results.filter((r) => r.status === 'error').length
   };
-}
-
-export interface JsonParse {
-  value: unknown;
-  error: { message: string; from: number | null } | null;
 }
 
 /** Parses the JSON input pane. Empty input evaluates against `{}`, like the engine default. */

@@ -1,7 +1,7 @@
 // Sample datasets + expressions, drawn from the engine's test suites
 // (official-cases, control-flow, filter/mapper/assert). `expected` documents
 // the outcome of every evaluable line, in order; the unit tests enforce it.
-import type { LineStatus } from './runner';
+import type { LineStatus } from './runner.z';
 
 export interface Sample {
   /** Kebab-case; doubles as the shareable URL slug (`?s=<id>`). */
